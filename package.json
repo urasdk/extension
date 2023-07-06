@@ -14,8 +14,40 @@
   "contributes": {
     "commands": [
       {
-        "command": "ura.execCmd",
+        "command": "sidebar_ura_cli.execCmd",
         "title": "Execute Ura Cli Command."
+      },
+      {
+        "command": "extension.openPackageOnNpm",
+        "title": "Open Npm Page",
+        "icon": {
+          "light": "resources/light/edit.svg",
+          "dark": "resources/dark/edit.svg"
+        }
+      },
+      {
+        "command": "sidebar_dependencies.selectVersion",
+        "title": "Select Version",
+        "icon": {
+          "light": "resources/light/choice.svg",
+          "dark": "resources/dark/choice.svg"
+        }
+      },
+      {
+        "command": "sidebar_dependencies.refresh",
+        "title": "Refresh",
+        "icon": {
+          "light": "resources/light/refresh.svg",
+          "dark": "resources/dark/refresh.svg"
+        }
+      },
+      {
+        "command": "sidebar_ura_cli.refresh",
+        "title": "Refresh",
+        "icon": {
+          "light": "resources/light/refresh.svg",
+          "dark": "resources/dark/refresh.svg"
+        }
       }
     ],
     "viewsContainers": {
@@ -30,8 +62,43 @@
     "views": {
       "sidebar": [
         {
-          "id": "sidebar_id1",
+          "id": "sidebar_ura_cli",
           "name": "Cli"
+        },
+        {
+          "id": "sidebar_dependencies",
+          "name": "Node Dependencies",
+          "icon": "resources/light/dependency.svg",
+          "contextualTitle": "Package Explorer"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "sidebar_dependencies.refresh",
+          "when": "view == sidebar_dependencies",
+          "group": "navigation"
+        },
+        {
+          "command": "sidebar_ura_cli.refresh",
+          "when": "view == sidebar_ura_cli",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "extension.openPackageOnNpm",
+          "when": "view == sidebar_dependencies && viewItem == dependency"
+        },
+        {
+          "command": "sidebar_dependencies.selectVersion",
+          "when": "view == sidebar_dependencies && viewItem == dependency"
+        },
+        {
+          "command": "sidebar_dependencies.selectVersion",
+          "when": "view == sidebar_dependencies && viewItem == dependency",
+          "group": "inline"
         }
       ]
     }

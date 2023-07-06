@@ -1,6 +1,6 @@
 import { execSync } from "child_process";
 
-export class UraCli {
+class UraCli {
   version: any = undefined;
   _cmds?: {
     [cmd: string]: {
@@ -56,8 +56,12 @@ export class UraCli {
             (_, cmd, usage, description) => {
               cmds[cmd] = {
                 usage: usage,
-                args: usage.match(/\<.*?\>/g)?.map((str: string) => str.replace(/[\<\>]/g, '')),
-                optArgs : usage.match(/\[.*?\]/g)?.map((str: string) => str.replace(/[\[\]]/g, '')),
+                args: usage
+                  .match(/\<.*?\>/g)
+                  ?.map((str: string) => str.replace(/[\<\>]/g, "")),
+                optArgs: usage
+                  .match(/\[.*?\]/g)
+                  ?.map((str: string) => str.replace(/[\[\]]/g, "")),
                 description: description,
               };
               return "";
@@ -71,3 +75,5 @@ export class UraCli {
     return cmds;
   }
 }
+
+export const cli = new UraCli();

@@ -7,3 +7,7 @@ export const ROOT_PATH =
     : undefined;
 
 export const CLI_TERMINAL_NAME = "ura cli";
+
+export const SIDEBAR_SCRIPTS = "sidebar_scripts";
+export const SIDEBAR_URA_CLI = "sidebar_ura_cli";
+export const SIDEBAR_DEPENDENCIES = "sidebar_dependencies";
