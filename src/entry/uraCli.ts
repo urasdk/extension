@@ -10,11 +10,10 @@ import {
   Terminal,
   EventEmitter,
 } from "vscode";
-import { join } from "path";
-import { readFileSync, accessSync } from "fs";
 
 import { cli } from "../lib/ura";
 import { SIDEBAR_URA_CLI, CLI_TERMINAL_NAME, ROOT_PATH } from "../lib/constant";
+import { common } from "../lib/common";
 
 // Entry Tree List
 export class UraCli implements TreeDataProvider<TreeItem> {
@@ -83,6 +82,7 @@ export class UraCli implements TreeDataProvider<TreeItem> {
     );
   }
   refresh(): void {
+    console.log("@@@@@@@@@@@ refresh");
     this._onDidChangeTreeData.fire();
   }
   getTreeItem(element: TreeItem): TreeItem | Thenable<TreeItem> {
@@ -90,7 +90,7 @@ export class UraCli implements TreeDataProvider<TreeItem> {
   }
 
   getChildren(element?: TreeItem): ProviderResult<TreeItem[]> {
-    if (!ROOT_PATH) {
+    if (!common.workspace) {
       return [];
     }
 
@@ -107,9 +107,8 @@ export class UraCli implements TreeDataProvider<TreeItem> {
           }
         });
     }
-    const packageJsonPath = join(ROOT_PATH, "package.json");
-    if (!this.pathExists(packageJsonPath)) {
-      window.showErrorMessage("Workspace has no package.json");
+
+    if (!common.packageJson) {
       return [];
     }
 
@@ -131,14 +130,17 @@ export class UraCli implements TreeDataProvider<TreeItem> {
 
         return children;
       } else {
-        const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+        const packageJson = common.packageJson!;
         for (const script in packageJson.scripts) {
           let item = new TreeItem(script, TreeItemCollapsibleState.None);
+
+          // TODO: 需要一个合适的 执行命令 图标
           // const iconRootPath = join(__filename, "../../..", "resources");
           // item.iconPath = {
           //   light: join(iconRootPath, "light", "play.svg"),
           //   dark: join(iconRootPath, "dark", "play.svg"),
           // };
+
           item.command = {
             command: SIDEBAR_URA_CLI + ".execScript",
             title: "Script",
@@ -155,14 +157,5 @@ export class UraCli implements TreeDataProvider<TreeItem> {
         new TreeItem("Scripts", TreeItemCollapsibleState.Collapsed),
       ];
     }
-  }
-  private pathExists(p: string): boolean {
-    try {
-      accessSync(p);
-    } catch (err) {
-      return false;
-    }
-
-    return true;
   }
 }

@@ -42,12 +42,24 @@
         }
       },
       {
+        "command": "sidebar_configuration.refresh",
+        "title": "Refresh",
+        "icon": {
+          "light": "resources/light/refresh.svg",
+          "dark": "resources/dark/refresh.svg"
+        }
+      },
+      {
         "command": "sidebar_ura_cli.refresh",
         "title": "Refresh",
         "icon": {
           "light": "resources/light/refresh.svg",
           "dark": "resources/dark/refresh.svg"
         }
+      },
+      {
+        "command": "sidebar_configuration.showText",
+        "title": "Show Text"
       }
     ],
     "viewsContainers": {
@@ -66,6 +78,10 @@
           "name": "Cli"
         },
         {
+          "id": "sidebar_configuration",
+          "name": "Configuration"
+        },
+        {
           "id": "sidebar_dependencies",
           "name": "Node Dependencies",
           "icon": "resources/light/dependency.svg",
@@ -78,6 +94,11 @@
         {
           "command": "sidebar_dependencies.refresh",
           "when": "view == sidebar_dependencies",
+          "group": "navigation"
+        },
+        {
+          "command": "sidebar_configuration.refresh",
+          "when": "view == sidebar_configuration",
           "group": "navigation"
         },
         {
