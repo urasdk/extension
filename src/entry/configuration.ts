@@ -33,13 +33,13 @@ export class Configuration implements TreeDataProvider<TreeItem> {
   readonly onDidChangeTreeData: Event<TreeItem | undefined | void> =
     this._onDidChangeTreeData.event;
 
-  private static savedFiles: RegExp[] = [
+  private static observedFilesRegExp: RegExp[] = [
     new RegExp(join(ROOT_PATH!, "capacitor.config.ts")),
     new RegExp(join(ROOT_PATH!, "package.json")),
     /build.gradle$/,
   ];
-  private capConfig: { [key: string]: any } = {};
-  private andConfig: {
+  private capacitorConfig: { [key: string]: any } = {};
+  private androidConfig: {
     version?: TextDocumentInfo;
     versionCode?: TextDocumentInfo;
   } = {};
@@ -56,15 +56,21 @@ export class Configuration implements TreeDataProvider<TreeItem> {
 
     this.resolveProject();
 
+    // Register file mutations
     common.addFileMutation("save", this.onSave.bind(this));
     common.addFileMutation("delete", this.onFileEvent.bind(this));
     common.addFileMutation("create", this.onFileEvent.bind(this));
 
+    // Register tree data provider
     window.registerTreeDataProvider(SIDEBAR_CONFIGURATION, this);
+
+    // Register showText command
     commands.registerCommand(
       SIDEBAR_CONFIGURATION + ".showText",
       (showTextInfo) => this.showText(showTextInfo)
     );
+
+    // Register refresh command
     commands.registerCommand(
       SIDEBAR_CONFIGURATION + ".refresh",
       this.refresh.bind(this)
@@ -90,114 +96,95 @@ export class Configuration implements TreeDataProvider<TreeItem> {
     }
 
     if (
-      !common.pathExists(join(ROOT_PATH!, "capacitor.config.ts")) &&
-      !common.pathExists(join(ROOT_PATH!, "capacitor.config.js"))
+      !common.pathExists(join(ROOT_PATH!, "capacitor.config.ts")) /* &&
+      !common.pathExists(join(ROOT_PATH!, "capacitor.config.js")) */
     ) {
       window.showErrorMessage('"capacitor.config.ts"  not found.');
       return;
     }
 
     await this.getCapacitorConfig();
-    await this.getPluginsInfo();
+    this.getPluginsInfo();
     await this.getAndroidConfig();
   }
 
   private async getCapacitorConfig() {
     try {
-      const { default: capConfig } = await common.loadTSFile(
+      const { default: capacitorConfig } = await common.loadTSFile(
         join(ROOT_PATH!, "capacitor.config.ts")
       );
 
-      this.capConfig = capConfig;
-      return capConfig;
+      this.capacitorConfig = capacitorConfig;
+      return capacitorConfig;
     } catch (error) {
       return null;
     }
   }
 
-  private async getPluginsInfo() {
+  /**
+   * Retrieves information about the plugins used in the application.
+   *
+   * @returns {Array} An array containing the information of the plugins.
+   */
+  private getPluginsInfo() {
+    // Get the list of possible plugins
     const possiblePlugins = [
       ...Object.keys(common.packageJson!.dependencies || {}),
-      ...(this.capConfig?.android?.localPlugins ||
-        this.capConfig?.localPlugins ||
+      ...(this.capacitorConfig?.android?.localPlugins ||
+        this.capacitorConfig?.localPlugins ||
         []),
     ];
 
     for (const pluginName of possiblePlugins) {
-      const info = await this.resolvePlugin(pluginName);
+      const info = common.resolvePlugin(pluginName);
+      // If the plugin is resolved successfully, add it to the list of plugins
       info && this.plugins.push(info);
     }
 
     return this.plugins;
   }
 
+  /**
+   * Retrieves the Android configuration.
+   */
   private async getAndroidConfig() {
     const buildGradlePath = join(ROOT_PATH!, "android", "app", "build.gradle");
+
     if (common.pathExists(buildGradlePath)) {
+      // Locate the versionName and versionCode properties in the build.gradle file
       await Promise.all([
         common.locateTextDocument(buildGradlePath, /versionName .*/),
         common.locateTextDocument(buildGradlePath, /versionCode .*/),
       ]).then(([version, versionCode]) => {
         if (version) {
           version.text = version.text.replace(/versionName /g, "");
-          this.andConfig.version = version;
+          this.androidConfig.version = version;
         }
         if (versionCode) {
           versionCode.text = versionCode.text.replace(/versionCode /g, "");
-          this.andConfig.versionCode = versionCode;
+          this.androidConfig.versionCode = versionCode;
         }
       });
     }
   }
 
-  private async resolvePlugin(name: string): Promise<any> {
-    try {
-      const packagePath = this.resolveNode(ROOT_PATH!, name, "package.json");
-
-      if (!packagePath) {
-        return null;
-      }
-
-      const rootPath = dirname(packagePath);
-      const meta = JSON.parse(readFileSync(packagePath, "utf-8"));
-      if (!meta) {
-        return null;
-      }
-      if (meta.capacitor) {
-        return {
-          id: name,
-          name: common.fixName(name),
-          version: meta.version,
-          rootPath,
-          repository: meta.repository,
-          manifest: meta.capacitor,
-        };
-      }
-      return {
-        id: name,
-        name: common.fixName(name),
-        version: meta.version,
-        rootPath: rootPath,
-        repository: meta.repository,
-      };
-    } catch (e) {
-      // ignore
-    }
-    return null;
-  }
-
-  private resolveNode(root: string, ...pathSegments: string[]): string | null {
-    try {
-      return require.resolve(pathSegments.join("/"), { paths: [root] });
-    } catch (e) {
-      return null;
-    }
-  }
-
   private shouldBeObserved(filePathOrName: string) {
-    return !!Configuration.savedFiles.find((reg) => reg.test(filePathOrName));
+    return !!Configuration.observedFilesRegExp.find((reg) =>
+      reg.test(filePathOrName)
+    );
   }
 
+  /**
+   * Show the specified text in a text document at the given position range.
+   *
+   * @param textInfo - The information of the text to be shown.
+   * @param textInfo.col - The starting column of the text.
+   * @param textInfo.row - The starting row of the text.
+   * @param textInfo.colend - The ending column of the text.
+   * @param textInfo.rowend - The ending row of the text.
+   * @param textInfo.text - The text to be shown.
+   * @param textInfo.path - The path of the text document.
+   */
   showText(textInfo: {
     col: number;
     row: number;
@@ -208,7 +195,11 @@ export class Configuration implements TreeDataProvider<TreeItem> {
   }) {
     const { col, row, colend, rowend, path } = textInfo;
     let uri = Uri.file(path);
+
+    // Create an options object with the specified selection range
     let options = { selection: new Range(row, col, rowend, colend) };
+
+    // Show the text document with the specified uri and options
     window.showTextDocument(uri, options);
   }
 
@@ -245,8 +236,10 @@ export class Configuration implements TreeDataProvider<TreeItem> {
   async generateChild(label: "Project" | "Plugins") {
     const children: ConItem[] = [];
     if (label === "Project") {
-      const { appId, appName } = this.capConfig;
-      const { versionCode, version } = this.andConfig;
+      const { appId, appName } = this.capacitorConfig;
+      const { versionCode, version } = this.androidConfig;
+
+      // Create an object containing the necessary information for child items
       const childrenObj = { appId, appName, versionCode, version };
       const textInfo = {
         appId: await common.locateTextDocument(
@@ -259,6 +252,7 @@ export class Configuration implements TreeDataProvider<TreeItem> {
         ),
       };
 
+      // Iterate through the properties of childrenObj
       for (const key in childrenObj) {
         if (Object.prototype.hasOwnProperty.call(childrenObj, key)) {
           const value =
@@ -283,7 +277,7 @@ export class Configuration implements TreeDataProvider<TreeItem> {
               title: "Show Text",
               arguments: [
                 (textInfo as any)[key] ??
-                  this.andConfig[key as "version" | "versionCode"],
+                  this.androidConfig[key as "version" | "versionCode"],
               ],
             }
           );
@@ -298,7 +292,7 @@ export class Configuration implements TreeDataProvider<TreeItem> {
 
   async refresh() {
     await this.getCapacitorConfig();
-    await this.getPluginsInfo();
+    this.getPluginsInfo();
     await this.getAndroidConfig();
     this._onDidChangeTreeData.fire();
   }

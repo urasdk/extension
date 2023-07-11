@@ -31,7 +31,7 @@ interface PluginInfo {
 class CommonModule {
   workspace = false;
   packageJson?: PackageJsonContent;
-  capConfig?: { [key: string]: any };
+  capacitorConfig?: { [key: string]: any };
   plugins: PluginInfo[] = [];
 
   private mutations: { [type: string]: Set<Function> } = {
@@ -199,42 +199,61 @@ class CommonModule {
     }
   }
 
+  /**
+   * Retrieves an array of plugins.
+   *
+   * @returns {PluginInfo[]} An array of plugins.
+   */
   async getPluginsArray() {
     try {
-      const { default: capConfig } = await this.loadTSFile(
+      // Load the capacitor.config.ts file
+      const { default: capacitorConfig } = await this.loadTSFile(
         join(ROOT_PATH!, "capacitor.config.ts")
       );
-      this.capConfig = capConfig;
+      this.capacitorConfig = capacitorConfig;
     } catch (error) {}
 
+    // Get the local plugins from the `capacitorConfig` object
     const localPlugins =
-      this.capConfig?.android?.localPlugins ||
-      this.capConfig?.localPlugins ||
+      this.capacitorConfig?.android?.localPlugins ||
+      this.capacitorConfig?.localPlugins ||
       [];
 
     const plugins: PluginInfo[] = [];
+
+    // Array of possible plugin names.
     const possible = [
       ...Object.keys(this.packageJson!.dependencies || {}),
       ...Object.keys(this.packageJson!.devDependencies || {}),
       ...localPlugins,
     ];
 
+    // Iterate over the possible plugin names and resolve each plugin.
     for (const key of possible) {
       const info = this.resolvePlugin(key);
+      // If the plugin was resolved, push it to the `plugins` array.
       info && plugins.push(info);
     }
 
     this.plugins = plugins;
 
+    // Return the array of plugins.
     return plugins;
   }
 
+  /**
+   * Resolves a plugin by name or path.
+   * Returns plugin metadata if found, otherwise returns null.
+   * @param nameOrPath - The name or path of the plugin.
+   * @returns The plugin metadata if found, otherwise null.
+   */
   resolvePlugin(nameOrPath: string) {
     try {
       const fullpath = join(ROOT_PATH!, nameOrPath, "package.json");
       const packagePath = require.resolve(fullpath, {
         paths: [ROOT_PATH!],
       });
+
       if (!packagePath) {
         return null;
       }
@@ -245,6 +264,7 @@ class CommonModule {
       if (!meta) {
         return null;
       }
+
       if (meta.capacitor) {
         return {
           id: nameOrPath,

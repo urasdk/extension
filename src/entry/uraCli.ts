@@ -82,7 +82,6 @@ export class UraCli implements TreeDataProvider<TreeItem> {
     );
   }
   refresh(): void {
-    console.log("@@@@@@@@@@@ refresh");
     this._onDidChangeTreeData.fire();
   }
   getTreeItem(element: TreeItem): TreeItem | Thenable<TreeItem> {
