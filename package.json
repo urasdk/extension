@@ -58,8 +58,24 @@
         }
       },
       {
+        "command": "sidebar_plugins.refresh",
+        "title": "Refresh",
+        "icon": {
+          "light": "resources/light/refresh.svg",
+          "dark": "resources/dark/refresh.svg"
+        }
+      },
+      {
         "command": "sidebar_configuration.showText",
         "title": "Show Text"
+      },
+      {
+        "command": "sidebar_plugins.ignore",
+        "title": "Ignore Plugin"
+      },
+      {
+        "command": "sidebar_plugins.activate",
+        "title": "Activate Plugin"
       }
     ],
     "viewsContainers": {
@@ -82,6 +98,10 @@
           "name": "Configuration"
         },
         {
+          "id": "sidebar_plugins",
+          "name": "Plugins"
+        },
+        {
           "id": "sidebar_dependencies",
           "name": "Node Dependencies",
           "icon": "resources/light/dependency.svg",
@@ -89,6 +109,12 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "sidebar_ura_cli",
+        "contents": "Please wait while inspecting project..."
+      }
+    ],
     "menus": {
       "view/title": [
         {
@@ -99,6 +125,11 @@
         {
           "command": "sidebar_configuration.refresh",
           "when": "view == sidebar_configuration",
+          "group": "navigation"
+        },
+        {
+          "command": "sidebar_plugins.refresh",
+          "when": "view == sidebar_plugins",
           "group": "navigation"
         },
         {
@@ -120,6 +151,18 @@
           "command": "sidebar_dependencies.selectVersion",
           "when": "view == sidebar_dependencies && viewItem == dependency",
           "group": "inline"
+        },
+        {
+          "command": "sidebar_plugins.ignore",
+          "when": "view == sidebar_plugins && viewItem == Local"
+        },
+        {
+          "command": "sidebar_plugins.ignore",
+          "when": "view == sidebar_plugins && viewItem == NPM"
+        },
+        {
+          "command": "sidebar_plugins.activate",
+          "when": "view == sidebar_plugins && viewItem == Ignore"
         }
       ]
     }
@@ -133,16 +176,19 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/vscode": "^1.54.0",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "20.2.5",
+    "@types/vscode": "^1.54.0",
     "@typescript-eslint/eslint-plugin": "^5.59.8",
     "@typescript-eslint/parser": "^5.59.8",
+    "@vscode/test-electron": "^2.3.2",
     "eslint": "^8.41.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
-    "typescript": "^5.1.3",
-    "@vscode/test-electron": "^2.3.2"
+    "typescript": "^5.1.3"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.22.7"
   }
 }

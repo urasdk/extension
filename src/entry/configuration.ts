@@ -9,15 +9,16 @@ import {
   Range,
   TextDocument,
   TreeItemCollapsibleState,
-  Command,
-  FileCreateEvent,
   FileDeleteEvent,
-  TextDocumentChangeEvent,
 } from "vscode";
-import { ROOT_PATH, SIDEBAR_CONFIGURATION } from "../lib/constant";
-import { readFileSync } from "fs";
-import { join, dirname, basename } from "path";
-import { common } from "../lib/common";
+import {
+  CAPACITOR_PATH,
+  PACKAGE_JSON_PATH,
+  ROOT_PATH,
+  SIDEBAR_CONFIGURATION,
+} from "../lib/constant";
+import { join } from "path";
+import { CommonItem, common } from "../lib/common";
 
 interface TextDocumentInfo {
   col: number;
@@ -34,8 +35,8 @@ export class Configuration implements TreeDataProvider<TreeItem> {
     this._onDidChangeTreeData.event;
 
   private static observedFilesRegExp: RegExp[] = [
-    new RegExp(join(ROOT_PATH!, "capacitor.config.ts")),
-    new RegExp(join(ROOT_PATH!, "package.json")),
+    new RegExp(CAPACITOR_PATH!),
+    new RegExp(PACKAGE_JSON_PATH!),
     /build.gradle$/,
   ];
   private capacitorConfig: { [key: string]: any } = {};
@@ -96,7 +97,7 @@ export class Configuration implements TreeDataProvider<TreeItem> {
     }
 
     if (
-      !common.pathExists(join(ROOT_PATH!, "capacitor.config.ts")) /* &&
+      !common.pathExists(CAPACITOR_PATH!) /* &&
       !common.pathExists(join(ROOT_PATH!, "capacitor.config.js")) */
     ) {
       window.showErrorMessage('"capacitor.config.ts"  not found.');
@@ -111,7 +112,7 @@ export class Configuration implements TreeDataProvider<TreeItem> {
   private async getCapacitorConfig() {
     try {
       const { default: capacitorConfig } = await common.loadTSFile(
-        join(ROOT_PATH!, "capacitor.config.ts")
+        CAPACITOR_PATH!
       );
 
       this.capacitorConfig = capacitorConfig;
@@ -155,7 +156,7 @@ export class Configuration implements TreeDataProvider<TreeItem> {
       await Promise.all([
         common.locateTextDocument(buildGradlePath, /versionName .*/),
         common.locateTextDocument(buildGradlePath, /versionCode .*/),
-      ]).then(([version, versionCode]) => {
+      ]).then(([[version], [versionCode]]) => {
         if (version) {
           version.text = version.text.replace(/versionName /g, "");
           this.androidConfig.version = version;
@@ -209,11 +210,8 @@ export class Configuration implements TreeDataProvider<TreeItem> {
 
   async getChildren(
     element?: TreeItem | undefined
-  ): Promise<(TreeItem | ConItem)[]> {
-    if (
-      !common.packageJson ||
-      !common.pathExists(join(ROOT_PATH!, "capacitor.config.ts"))
-    ) {
+  ): Promise<(TreeItem | CommonItem)[]> {
+    if (!common.packageJson || !common.pathExists(CAPACITOR_PATH!)) {
       return [];
     }
 
@@ -231,10 +229,10 @@ export class Configuration implements TreeDataProvider<TreeItem> {
    * Generates a child based on the provided label.
    *
    * @param { "Project" | "Plugins" } label - The label to determine which child to generate.
-   * @return { ConItem[] } An array of generated child items.
+   * @return { CommonItem[] } An array of generated child items.
    */
   async generateChild(label: "Project" | "Plugins") {
-    const children: ConItem[] = [];
+    const children: CommonItem[] = [];
     if (label === "Project") {
       const { appId, appName } = this.capacitorConfig;
       const { versionCode, version } = this.androidConfig;
@@ -242,14 +240,18 @@ export class Configuration implements TreeDataProvider<TreeItem> {
       // Create an object containing the necessary information for child items
       const childrenObj = { appId, appName, versionCode, version };
       const textInfo = {
-        appId: await common.locateTextDocument(
-          join(ROOT_PATH!, "capacitor.config.ts"),
-          /appId: ?['"](.*)?['"]/
-        ),
-        appName: await common.locateTextDocument(
-          join(ROOT_PATH!, "capacitor.config.ts"),
-          /appName: ?['"](.*)?['"]/
-        ),
+        appId: (
+          await common.locateTextDocument(
+            CAPACITOR_PATH!,
+            /appId: ?['"](.*)?['"]/
+          )
+        )[0],
+        appName: (
+          await common.locateTextDocument(
+            CAPACITOR_PATH!,
+            /appName: ?['"](.*)?['"]/
+          )
+        )[0],
       };
 
       // Iterate through the properties of childrenObj
@@ -268,7 +270,7 @@ export class Configuration implements TreeDataProvider<TreeItem> {
             key[0].toUpperCase() +
             key.slice(1).replace(/[A-Z]/g, (m) => " " + m.toUpperCase());
 
-          const child = new ConItem(
+          const child = new CommonItem(
             name,
             value,
             TreeItemCollapsibleState.None,
@@ -295,20 +297,5 @@ export class Configuration implements TreeDataProvider<TreeItem> {
     this.getPluginsInfo();
     await this.getAndroidConfig();
     this._onDidChangeTreeData.fire();
-  }
-}
-
-class ConItem extends TreeItem {
-  constructor(
-    public readonly name: string,
-    public readonly description: string,
-    public readonly collapsibleState: TreeItemCollapsibleState,
-    public command?: Command
-  ) {
-    super(name, collapsibleState);
-
-    this.tooltip = this.name;
-    this.description = this.description;
-    command && (this.command = command);
   }
 }

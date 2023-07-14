@@ -33,6 +33,13 @@ export class DepNodeProvider implements TreeDataProvider<Item> {
   }
 
   registerModule() {
+    if (
+      !Object.keys(common.packageJson?.dependencies || {}).length &&
+      !Object.keys(common.packageJson?.devDependencies || {}).length
+    ) {
+      return;
+    }
+
     window.registerTreeDataProvider(SIDEBAR_DEPENDENCIES, this);
     commands.registerCommand(SIDEBAR_DEPENDENCIES + ".refresh", () =>
       this.refresh()

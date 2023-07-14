@@ -5,10 +5,13 @@ import {
   TextDocumentChangeEvent,
   window,
   workspace,
+  TreeItem,
+  Command,
+  TreeItemCollapsibleState,
 } from "vscode";
-import { join, resolve, dirname, basename } from "path";
+import { join, resolve, dirname, basename, sep } from "path";
 
-import { ROOT_PATH } from "./constant";
+import { CAPACITOR_PATH, ROOT_PATH } from "./constant";
 
 type ObserveType = "save" | "change" | "delete" | "create";
 
@@ -19,20 +22,31 @@ interface PackageJsonContent {
   devDependencies?: { [packName: string]: string };
 }
 
-interface PluginInfo {
+export interface PluginInfo {
   id: string;
   name: string;
   version: any;
   rootPath: string;
   repository: any;
   manifest?: undefined;
+  local: boolean;
+}
+export interface TextDocumentInfo {
+  col: number;
+  row: number;
+  colend: number;
+  rowend: number;
+  text: string;
+  path: string;
 }
 
 class CommonModule {
   workspace = false;
   packageJson?: PackageJsonContent;
   capacitorConfig?: { [key: string]: any };
-  plugins: PluginInfo[] = [];
+  plugins?: PluginInfo[];
+
+  private getPluginsTimeout?: number;
 
   private mutations: { [type: string]: Set<Function> } = {
     save: new Set(),
@@ -49,7 +63,7 @@ class CommonModule {
 
     this.workspace = true;
     this.getPackageJson(ROOT_PATH);
-
+    this.getPluginsArray();
     if (!this.packageJson) {
       window.showErrorMessage("Workspace has no package.json");
     }
@@ -68,18 +82,53 @@ class CommonModule {
     this.mutations[type].add(callback);
   }
 
+  /**
+   * Returns a listener function that executes callbacks for a specific observe type.
+   * @param type - The observe type.
+   * @param debounce - Whether to debounce the execution of callbacks.
+   * @returns The listener function.
+   */
   getListener(type: ObserveType, debounce: boolean = true) {
     let timer: NodeJS.Timeout;
-    return (file: TextDocument | TextDocumentChangeEvent | FileDeleteEvent) => {
+
+    /**
+     * Executes the callbacks for the specified file.
+     * @param file - The file to pass to the callbacks.
+     */
+    const executeCallbacks = (
+      file: TextDocument | TextDocumentChangeEvent | FileDeleteEvent
+    ) => {
+      this.mutations[type].forEach((callback) => callback(file));
+    };
+
+    /**
+     * Debounces the execution of the callbacks for the specified file.
+     * @param file - The file to pass to the callbacks.
+     */
+    const debouncedExecuteCallbacks = (
+      file: TextDocument | TextDocumentChangeEvent | FileDeleteEvent
+    ) => {
+      timer && clearTimeout(timer);
+      timer = setTimeout(() => {
+        executeCallbacks(file);
+      }, 500);
+    };
+
+    /**
+     * Handles the file events and executes the appropriate callbacks.
+     * @param file - The file to pass to the callbacks.
+     */
+    const listener = (
+      file: TextDocument | TextDocumentChangeEvent | FileDeleteEvent
+    ) => {
       if (debounce) {
-        timer && clearTimeout(timer);
-        timer = setTimeout(() => {
-          this.mutations[type].forEach((callback) => callback(file));
-        }, 500);
+        debouncedExecuteCallbacks(file);
       } else {
-        this.mutations[type].forEach((callback) => callback(file));
+        executeCallbacks(file);
       }
     };
+
+    return listener;
   }
 
   getPackageJson(path: string): PackageJsonContent | undefined {
@@ -159,44 +208,52 @@ class CommonModule {
   }
 
   /**
-   * Locates a text document based on the given file path and regular expression.
+   * Locates occurrences of a regular expression in a text document.
    *
-   * @param {string} filePath - The path of the text document.
-   * @param {string | RegExp} regexp - The regular expression used to locate the text.
-   * @return {Promise<{ col: number, row: number, colend: number, rowend: number, text: string, path: string } | undefined>} A promise that resolves with the location of the text document, or undefined if not found.
+   * @param filePath - The path of the text document.
+   * @param regexp - The regular expression to search for.
+   * @returns An array of TextDocumentInfo objects representing the occurrences.
    */
   async locateTextDocument(filePath: string, regexp: string | RegExp) {
     if (typeof regexp === "string") {
-      regexp = new RegExp(regexp);
+      regexp = new RegExp(regexp, "g");
+    } else if (!regexp.global) {
+      regexp = new RegExp(regexp.source, "g");
     }
-    let col!: number,
-      row!: number,
-      colend!: number,
-      rowend!: number,
-      text!: string;
 
+    // Open the text document
     const doc = await workspace.openTextDocument(filePath);
-    const textLines = doc.getText().split("\n");
-    const result = textLines.find((line, i) => {
-      const matches = line.match(regexp);
-      if (matches) {
-        row = i;
-        col = matches.index!;
+    const results: TextDocumentInfo[] = [];
+    const context = doc.getText();
 
-        const matchStr = matches[0].split("\n");
-        const spanRow = matchStr.length - 1;
-        const lastRowLength = matchStr[spanRow].length;
+    // Find all matches of the regular expression in the text document
+    const matches = context.matchAll(regexp);
 
-        text = matches[0];
-        colend = col + lastRowLength;
-        rowend = row + spanRow;
-      }
+    // Process each match
+    for (const value of matches) {
+      const text = value[0];
+      const preText = context.slice(0, value.index!);
 
-      return !!matches;
-    });
-    if (result) {
-      return { col, row, colend, rowend, text, path: filePath };
+      // Split the text and preText into lines
+      const lines = text.split("\n");
+      const preLines = preText.split("\n");
+
+      // Get the last line of text and preText
+      const lastLine = lines[lines.length - 1];
+      const lastPreLine = preLines[preLines.length - 1];
+
+      // Create a TextDocumentInfo object and add it to the results array
+      results.push({
+        col: lastPreLine.length,
+        row: preLines.length - 1,
+        colend: lastPreLine.length + lastLine.length,
+        rowend: preLines.length + lines.length - 2,
+        text,
+        path: filePath,
+      });
     }
+
+    return results;
   }
 
   /**
@@ -206,11 +263,16 @@ class CommonModule {
    */
   async getPluginsArray() {
     try {
-      // Load the capacitor.config.ts file
-      const { default: capacitorConfig } = await this.loadTSFile(
-        join(ROOT_PATH!, "capacitor.config.ts")
-      );
-      this.capacitorConfig = capacitorConfig;
+      if (
+        !this.capacitorConfig ||
+        Date.now() > (this.getPluginsTimeout ?? 0) + 300
+      ) {
+        // Load the capacitor.config.ts file
+        const { default: capacitorConfig } = await this.loadTSFile(
+          CAPACITOR_PATH!
+        );
+        this.capacitorConfig = capacitorConfig;
+      }
     } catch (error) {}
 
     // Get the local plugins from the `capacitorConfig` object
@@ -219,7 +281,7 @@ class CommonModule {
       this.capacitorConfig?.localPlugins ||
       [];
 
-    const plugins: PluginInfo[] = [];
+    let plugins: PluginInfo[] | undefined;
 
     // Array of possible plugin names.
     const possible = [
@@ -231,12 +293,15 @@ class CommonModule {
     // Iterate over the possible plugin names and resolve each plugin.
     for (const key of possible) {
       const info = this.resolvePlugin(key);
-      // If the plugin was resolved, push it to the `plugins` array.
-      info && plugins.push(info);
+      if (info) {
+        !plugins && (plugins = []);
+        localPlugins.indexOf(key) !== -1 && (info.local = true);
+        plugins.push(info);
+      }
     }
 
     this.plugins = plugins;
-
+    this.getPluginsTimeout = Date.now();
     // Return the array of plugins.
     return plugins;
   }
@@ -249,7 +314,11 @@ class CommonModule {
    */
   resolvePlugin(nameOrPath: string) {
     try {
-      const fullpath = join(ROOT_PATH!, nameOrPath, "package.json");
+      let local =
+        nameOrPath.startsWith("link:") || nameOrPath.startsWith("file:");
+      let fullpath = [nameOrPath.replace(/^file:/, ""), "package.json"].join(
+        sep
+      );
       const packagePath = require.resolve(fullpath, {
         paths: [ROOT_PATH!],
       });
@@ -260,7 +329,6 @@ class CommonModule {
 
       const rootPath = dirname(packagePath);
       const meta = JSON.parse(readFileSync(packagePath, "utf-8"));
-
       if (!meta) {
         return null;
       }
@@ -268,11 +336,12 @@ class CommonModule {
       if (meta.capacitor) {
         return {
           id: nameOrPath,
-          name: this.fixName(nameOrPath),
+          name: this.fixName(meta.name),
           version: meta.version,
           rootPath,
           repository: meta.repository,
           manifest: meta.capacitor,
+          local: local,
         };
       }
 
@@ -282,18 +351,130 @@ class CommonModule {
     }
   }
 
+  /**
+   * Fixes the given name according to the specified rules.
+   *
+   * @param name - The name to be fixed.
+   * @returns The fixed name.
+   */
   fixName(name: string): string {
+    // Check if the name starts with ".", "~", or "/" and remove any leading path separators
     if (name.startsWith(".") || name.startsWith("~") || name.startsWith("/")) {
       name = basename(name);
     }
+
     name = name
       .replace(/\//g, "_")
       .replace(/-/g, "_")
       .replace(/@/g, "")
       .replace(/_\w/g, (m) => m[1].toUpperCase());
 
+    // Capitalize the first letter of the name
     return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  /**
+   * Retrieves the information of the Capacitor configuration text.
+   *
+   * @returns {Object} - The information of the Capacitor configuration text.
+   */
+  async getCapacitorConfigTextInfo() {
+    // Check if the Capacitor path exists
+    if (!CAPACITOR_PATH || !this.pathExists(CAPACITOR_PATH)) {
+      return;
+    }
+
+    // Locate the capacitor config Object in the Capacitor config file
+    const capacitorObjInfo = (
+      await this.locateTextDocument(
+        CAPACITOR_PATH!,
+        // Match an object with possible nested objects
+        /{(?:[^{}]|{(?:[^{}]|{(?:[^{}]|{[^{}]*})*})*})*}/
+      )
+    ).filter((info) => {
+      try {
+        // Compare the evaluated object with the capacitorConfig
+        return this.compareVariables(
+          eval("(" + info.text + ")"),
+          this.capacitorConfig
+        );
+      } catch (error) {
+        return false;
+      }
+    })[0];
+
+    return capacitorObjInfo;
+  }
+
+  /**
+   * Compare two variables and determine if they are equal.
+   *
+   * @param a - The first variable to compare.
+   * @param b - The second variable to compare.
+   * @returns True if the variables are equal, false otherwise.
+   */
+  compareVariables(a: any, b: any): boolean {
+    if (typeof a !== typeof b) {
+      return false;
+    }
+
+    // Check if a and b are both arrays
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) {
+        return false;
+      }
+      // Recursively compare each element of the arrays
+      return a.every((value, index) => this.compareVariables(value, b[index]));
+    }
+
+    // Check if a and b are both objects
+    if (
+      typeof a === "object" &&
+      a !== null &&
+      typeof b === "object" &&
+      b !== null
+    ) {
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
+
+      if (keysA.length !== keysB.length) {
+        return false;
+      }
+
+      // Recursively compare each value of the objects
+      return keysA.every((key) => this.compareVariables(a[key], b[key]));
+    }
+
+    return a === b;
+  }
+
+  /**
+   * Saves a file at the specified path.
+   *
+   * @param {string} path - The path of the file to be saved.
+   */
+  saveFile(path: string) {
+    const doc = workspace.textDocuments.find((doc) => {
+      return doc.uri.fsPath === path;
+    });
+
+    doc?.save();
   }
 }
 
 export const common = new CommonModule();
+
+export class CommonItem extends TreeItem {
+  constructor(
+    public readonly name: string,
+    public readonly description: string,
+    public readonly collapsibleState: TreeItemCollapsibleState,
+    public command?: Command,
+    public args?: { [key: string]: any }
+  ) {
+    super(name, collapsibleState);
+
+    this.tooltip = this.name;
+    this.description = this.description;
+  }
+}
