@@ -10,10 +10,11 @@ import {
   Uri,
   ProgressLocation,
 } from "vscode";
-import { ROOT_PATH, SIDEBAR_DEPENDENCIES } from "../lib/constant";
-import { readFileSync, accessSync } from "fs";
 import { join } from "path";
 import { exec } from "child_process";
+
+import { ROOT_PATH, SIDEBAR_DEPENDENCIES } from "../lib/constant";
+import { common } from "../lib/common";
 
 type Item = Dependency | TreeItem;
 export class DepNodeProvider implements TreeDataProvider<Item> {
@@ -32,6 +33,13 @@ export class DepNodeProvider implements TreeDataProvider<Item> {
   }
 
   registerModule() {
+    if (
+      !Object.keys(common.packageJson?.dependencies || {}).length &&
+      !Object.keys(common.packageJson?.devDependencies || {}).length
+    ) {
+      return;
+    }
+
     window.registerTreeDataProvider(SIDEBAR_DEPENDENCIES, this);
     commands.registerCommand(SIDEBAR_DEPENDENCIES + ".refresh", () =>
       this.refresh()
@@ -128,7 +136,8 @@ export class DepNodeProvider implements TreeDataProvider<Item> {
     const arr = JSON.parse(versions); // Parse the versions string as an array
     if (arr.length) {
       const title = `Select version of ${pkgName}`;
-      return await window.showQuickPick(arr, { title });
+      window.showErrorMessage(JSON.stringify(arr.reverse()));
+      return await window.showQuickPick(arr.reverse(), { title });
     } else {
       return undefined;
     }
@@ -181,81 +190,69 @@ export class DepNodeProvider implements TreeDataProvider<Item> {
     return element;
   }
 
-  getChildren(element?: Dependency): Thenable<(Dependency | TreeItem)[]> {
-    if (!ROOT_PATH) {
-      window.showInformationMessage("No dependency in empty workspace");
-      return Promise.resolve([]);
+  async getChildren(element?: Dependency): Promise<(Dependency | TreeItem)[]> {
+    if (!common.packageJson) {
+      return [];
     }
 
-    if (element) {
-      if (element.label === "Dependencies") {
-        return Promise.resolve(this.deps.dependencies);
-      } else {
-        return Promise.resolve(this.deps.devDependencies);
-      }
-    } else {
-      const packageJsonPath = join(ROOT_PATH, "package.json");
-      if (this.pathExists(packageJsonPath)) {
-        this.deps = this.getDepsInPackageJson(packageJsonPath);
-        return Promise.resolve([
-          new TreeItem("Dependencies", TreeItemCollapsibleState.Collapsed),
-          new TreeItem("DevDependencies", TreeItemCollapsibleState.Collapsed),
-        ]);
-      } else {
-        window.showErrorMessage("Workspace has no package.json");
-        return Promise.resolve([]);
-      }
+    if (element?.label === "Dependencies") {
+      return this.deps.dependencies;
     }
+
+    if (element?.label === "DevDependencies") {
+      return this.deps.devDependencies;
+    }
+    this.deps = this.getDepsInPackageJson();
+    const depsArr: TreeItem[] = [];
+
+    if (this.deps.dependencies.length) {
+      depsArr.push(
+        new TreeItem("Dependencies", TreeItemCollapsibleState.Collapsed)
+      );
+    }
+
+    if (this.deps.devDependencies.length) {
+      depsArr.push(
+        new TreeItem("DevDependencies", TreeItemCollapsibleState.Collapsed)
+      );
+    }
+
+    return depsArr;
   }
 
   /**
    * Given the path to package.json, read all its dependencies and devDependencies.
    */
-  private getDepsInPackageJson(packageJsonPath: string) {
-    const workspaceRoot = ROOT_PATH;
-    if (this.pathExists(packageJsonPath) && workspaceRoot) {
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+  private getDepsInPackageJson() {
+    const packageJson = common.packageJson!;
 
-      const toDepency = (moduleName: string, version: string): Dependency => {
-        return new Dependency(
-          moduleName,
-          version,
-          TreeItemCollapsibleState.None,
-          {
-            command: "extension.openPackageOnNpm",
-            title: "",
-            arguments: [moduleName],
-          }
-        );
-      };
+    const toDepency = (moduleName: string, version: string): Dependency => {
+      return new Dependency(
+        moduleName,
+        version,
+        TreeItemCollapsibleState.None,
+        {
+          command: "extension.openPackageOnNpm",
+          title: "",
+          arguments: [moduleName],
+        }
+      );
+    };
 
-      const deps = packageJson.dependencies
-        ? Object.keys(packageJson.dependencies).map((dep) =>
-            toDepency(dep, packageJson.dependencies[dep])
-          )
-        : [];
-      const devDeps = packageJson.devDependencies
-        ? Object.keys(packageJson.devDependencies).map((dep) =>
-            toDepency(dep, packageJson.devDependencies[dep])
-          )
-        : [];
-      return {
-        dependencies: deps,
-        devDependencies: devDeps,
-      };
-    } else {
-      return this.deps;
-    }
-  }
-
-  private pathExists(p: string): boolean {
-    try {
-      accessSync(p);
-    } catch (err) {
-      return false;
-    }
-
-    return true;
+    const deps = packageJson.dependencies
+      ? Object.keys(packageJson.dependencies).map((dep) =>
+          toDepency(dep, packageJson.dependencies![dep])
+        )
+      : [];
+    const devDeps = packageJson.devDependencies
+      ? Object.keys(packageJson.devDependencies).map((dep) =>
+          toDepency(dep, packageJson.devDependencies![dep])
+        )
+      : [];
+    return {
+      dependencies: deps,
+      devDependencies: devDeps,
+    };
   }
 }
 
