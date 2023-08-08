@@ -1,6 +1,6 @@
 {
-  "name": "ura",
-  "displayName": "Ura",
+  "name": "urasdk",
+  "displayName": "UraSDK",
   "description": "Extension for Ura App development",
   "version": "0.0.1",
   "engines": {
@@ -13,6 +13,10 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
+      {
+        "command": "sidebar.installGlobal",
+        "title": "Install npm package globally."
+      },
       {
         "command": "sidebar_ura_cli.execCmd",
         "title": "Execute Ura Cli Command."
@@ -112,7 +116,19 @@
     "viewsWelcome": [
       {
         "view": "sidebar_ura_cli",
-        "contents": "Please wait while inspecting project..."
+        "contents": "Please wait while getting cli details..."
+      },
+      {
+        "view": "sidebar_configuration",
+        "contents": "Please wait while reading configuration..."
+      },
+      {
+        "view": "sidebar_plugins",
+        "contents": "Please wait while identifying project..."
+      },
+      {
+        "view": "sidebar_dependencies",
+        "contents": "Please wait while reading package.json..."
       }
     ],
     "menus": {
