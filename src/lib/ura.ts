@@ -12,8 +12,7 @@ class UraCli {
   };
 
   constructor() {
-    this.getUraVersion();
-    this.getCommands();
+    this.getUraVersion() !== "uninstall" && this.getCommands();
   }
 
   getUraVersion() {
@@ -24,6 +23,8 @@ class UraCli {
     } catch (error) {
       this.version = "uninstall";
     }
+
+    return this.version;
   }
 
   getConfiguration() {}

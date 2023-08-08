@@ -12,6 +12,7 @@ import {
 import { join, resolve, dirname, basename, sep } from "path";
 
 import { CAPACITOR_PATH, ROOT_PATH } from "./constant";
+import { verdaccioHelper } from "./verdaccio";
 
 type ObserveType = "save" | "change" | "delete" | "create";
 
@@ -40,11 +41,14 @@ export interface TextDocumentInfo {
   path: string;
 }
 
+const supportedOS = ["darwin", "win32", "linux"];
+
 class CommonModule {
   workspace = false;
   packageJson?: PackageJsonContent;
   capacitorConfig?: { [key: string]: any };
   plugins?: PluginInfo[];
+  os: NodeJS.Platform = "linux";
 
   private getPluginsTimeout?: number;
 
@@ -58,6 +62,15 @@ class CommonModule {
   constructor() {
     if (!ROOT_PATH) {
       window.showInformationMessage("No dependency in empty workspace");
+      return;
+    }
+
+    const currentOS = process.platform;
+
+    if (supportedOS.includes(currentOS)) {
+      this.os = currentOS;
+    } else {
+      window.showErrorMessage("Unsupported OS");
       return;
     }
 
@@ -76,6 +89,8 @@ class CommonModule {
     workspace.onDidCreateFiles(this.getListener("create").bind(this));
 
     workspace.onDidSaveTextDocument(this.getPackageJson.bind(this, ROOT_PATH));
+
+    verdaccioHelper.getVerdaccioConfig();
   }
 
   addFileMutation(type: ObserveType, callback: Function) {

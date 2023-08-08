@@ -13,7 +13,8 @@ export const PACKAGE_JSON_PATH = ROOT_PATH
   ? join(ROOT_PATH, "package.json")
   : undefined;
 
-export const CLI_TERMINAL_NAME = "ura cli";
+export const TERMINAL_NAME = "ura";
+export const URA_CLI_PACKAGE_NAME = "@ura/cli";
 
 export const SIDEBAR_SCRIPTS = "sidebar_scripts";
 export const SIDEBAR_URA_CLI = "sidebar_ura_cli";

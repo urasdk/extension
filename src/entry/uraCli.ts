@@ -12,7 +12,11 @@ import {
 } from "vscode";
 
 import { cli } from "../lib/ura";
-import { SIDEBAR_URA_CLI, CLI_TERMINAL_NAME, ROOT_PATH } from "../lib/constant";
+import {
+  SIDEBAR_URA_CLI,
+  TERMINAL_NAME,
+  URA_CLI_PACKAGE_NAME,
+} from "../lib/constant";
 import { common } from "../lib/common";
 
 // Entry Tree List
@@ -22,9 +26,7 @@ export class UraCli implements TreeDataProvider<TreeItem> {
   onDidChangeTreeData: Event<void | TreeItem | null | undefined> =
     this._onDidChangeTreeData.event;
 
-  terminal = window.terminals.find(
-    (t) => t.name === CLI_TERMINAL_NAME
-  ) as Terminal;
+  terminal = window.terminals.find((t) => t.name === TERMINAL_NAME) as Terminal;
 
   constructor(context: ExtensionContext) {
     this.registerModule(context);
@@ -58,7 +60,7 @@ export class UraCli implements TreeDataProvider<TreeItem> {
         }
 
         if (!this.terminal || this.terminal.exitStatus) {
-          this.terminal = window.createTerminal(CLI_TERMINAL_NAME);
+          this.terminal = window.createTerminal(TERMINAL_NAME);
         }
 
         this.terminal.show();
@@ -72,7 +74,7 @@ export class UraCli implements TreeDataProvider<TreeItem> {
         async (args) => {
           const cmdArgs = ["npm run", args];
           if (!this.terminal || this.terminal.exitStatus) {
-            this.terminal = window.createTerminal(CLI_TERMINAL_NAME);
+            this.terminal = window.createTerminal(TERMINAL_NAME);
           }
 
           this.terminal.show();
@@ -82,6 +84,9 @@ export class UraCli implements TreeDataProvider<TreeItem> {
     );
   }
   refresh(): void {
+    if (cli.version === "uninstall") {
+      cli.getUraVersion();
+    }
     this._onDidChangeTreeData.fire();
   }
   getTreeItem(element: TreeItem): TreeItem | Thenable<TreeItem> {
@@ -102,7 +107,9 @@ export class UraCli implements TreeDataProvider<TreeItem> {
         )
         .then((...arg) => {
           if (arg[0] === "confirm") {
-            // TODO: 提醒用户全局安装
+            const args = [URA_CLI_PACKAGE_NAME];
+
+            commands.executeCommand("sidebar.installGlobal", args);
           }
         });
     }
@@ -150,11 +157,20 @@ export class UraCli implements TreeDataProvider<TreeItem> {
         return children;
       }
     } else {
-      //根节点
-      return [
-        new TreeItem("Cli commands", TreeItemCollapsibleState.Collapsed),
-        new TreeItem("Scripts", TreeItemCollapsibleState.Collapsed),
-      ];
+      if (cli.version !== "uninstall") {
+        return [
+          new TreeItem("Cli commands", TreeItemCollapsibleState.Collapsed),
+          new TreeItem("Scripts", TreeItemCollapsibleState.Collapsed),
+        ];
+      } else {
+        const item = new TreeItem("Install Cli", TreeItemCollapsibleState.None);
+        item.command = {
+          command: "sidebar.installGlobal",
+          title: "Install Cli",
+          arguments: ["@ura/cli"],
+        };
+        return [item];
+      }
     }
   }
 }

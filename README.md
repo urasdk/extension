@@ -1,71 +1,59 @@
 # ura README
 
-This is the README for your extension "ura". After writing up a brief description, we recommend including the following sections.
+为 Ura Cli 的便捷使用而创建的插件
 
-## Features
+## 功能
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- [Cli commands](#cli-commands): 脚手架命令快捷调用列表
+- [Scripts](#scripts): 从 `package.json` 中运行脚本命令
+- [Project](#project-confiuration): Ura App 项目的配置
+- [NPM Plugins](#npm-plugins): 通过 NPM 管理的在线插件
+- [Local Plugins](#local-plugins): 管理代码存储在本地的插件
+- [Ignore Plugins](#ignore): 忽略指定的在线或者本地插件
+- [Switch Plugin Status](#switch-status): 切换插件的激活状态
+- [Dependencies](#dependencies): 项目生产依赖
+- [Devdependencies](#dependencies): 项目开发依赖
 
-For example if there is an image subfolder under your extension project workspace:
 
-\!\[feature X\]\(images/feature-x.png\)
+# 模块
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Cli commands
+:::caution
+ `CLI` 模块需要全局安装 [`@ura/cli`] 支持
+:::note
 
-## Requirements
+模块加载时会读取 `ura cli` 的命令，并将每一条命令列举出来
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+在点击指定命令后，将会根据命令的需求向用户提供输入/选择框并执行命令
 
-## Extension Settings
+## Scripts
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+模块加载时会读取工作区目录下的 `package.json` 文件中的所有脚本命令，并在点击指定命令后即可根据脚本命令内容执行
 
-For example:
+## Project Configuration
 
-This extension contributes the following settings:
+该模块将会在加载时读取 `capacitor.config.ts` 以及 `android` 文件夹内的配置并以列表的形式在模块中给出
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+点击配置将会跳转到相应文件的对应位置中
 
-## Known Issues
+## NPM Plugins
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+该模块可记录并操作项目的在线插件列表。在加载及文件变动时将会检查 `package.json` 的依赖包，逐一辨别依赖包是否为插件，符合则会被记录并作为列表内容
 
-## Release Notes
+## Local Plugins
 
-Users appreciate release notes as you update your extension.
+该模块可记录并操作项目的本地插件列表。在加载及文件变动时会读取 `capacitor.config.ts` 的 `android/localPlugins` 或 `localPlugins` 属性内容，当属性存在且属性值所指地址的文件经检查为插件时，将被记录并作为列表内容
 
-### 1.0.0
+## Ignore Plugins
 
-Initial release of ...
+该模块可记录并操作项目的忽略插件列表。在加载及文件变动时会读取 `capacitor.config.ts` 的 `android/ignorePlugins` 或 `ignorePlugins` 属性内容，当属性存在且属性值所指地址的文件经检查为插件时，将被记录并作为列表内容
 
-### 1.0.1
+## Switch Plugin Status
 
-Fixed issue #.
+在线插件与本地插件可以通过面板的忽略功能，快捷修改 `capacitor.config.ts` 中 `ignorePlugins` 属性进行选择性的忽略
 
-### 1.1.0
+同样的，被忽略中的组件也可以随时通过面板激活
 
-Added features X, Y, and Z.
+## Dependencies
 
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+该模块记录项目的开发和生产依赖，通过读取工作区根目录下的 `package.json` 列出当前项目的依赖及其版本
